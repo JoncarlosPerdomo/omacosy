@@ -182,6 +182,12 @@ ctrl-alt-tab = 'focus-monitor next --wrap-around'
 # the same slot, so the twin workspace keeps its meaning
 # (whole-workspace moves conflict with the per-monitor assignment)
 cmd-ctrl-alt-shift-o = 'exec-and-forget $HOME/.local/bin/omacosy-ws 0 throw'
+cmd-ctrl-alt-shift-0 = 'exec-and-forget $HOME/.local/bin/omacosy-ws 0 throw' # digit twin of O
+# Spatial throws: the focused window to the monitor physically left or
+# right of this one (its visible workspace, not the slot twin), so a
+# three-display move is one press instead of two cycles. `<` and `>`.
+cmd-ctrl-alt-shift-comma = 'move-node-to-monitor --focus-follows-window --wrap-around left'
+cmd-ctrl-alt-shift-period = 'move-node-to-monitor --focus-follows-window --wrap-around right'
 # Throw the whole workspace
 # every window, to its twin on the other monitor
 cmd-ctrl-alt-shift-space = 'exec-and-forget $HOME/.local/bin/omacosy-ws 0 throw-all'
@@ -218,11 +224,13 @@ esc = ['reload-config', 'mode main']
 r = ['flatten-workspace-tree', 'mode main']  # reset layout
 backspace = ['close-all-windows-but-current', 'mode main']
 
-# Independent NINE workspaces per display, omarchy-style: the main
-# display owns 1-9, the secondary owns 11-19 (same LAST digit = same
-# slot; the bar and overview render only the slot digit). Super+N is
-# monitor-aware via omacosy-ws. On a single display the secondary set
-# falls back to main and just sits empty.
+# Independent NINE workspaces per display, omarchy-style, keyed by the
+# SAME last digit (the bar and overview render only the slot digit).
+# Monitors are pinned by name because aerospace's `secondary` alias only
+# resolves with exactly two displays; with three it fell back to main and
+# stacked every workspace on one screen. Each entry falls back to main,
+# so undocked everything collapses onto the built-in display and docking
+# sends the sets back home. Super+N is monitor-aware via omacosy-ws.
 [workspace-to-monitor-force-assignment]
 1 = ['main']
 2 = ['main']
@@ -233,12 +241,21 @@ backspace = ['close-all-windows-but-current', 'mode main']
 7 = ['main']
 8 = ['main']
 9 = ['main']
-11 = ['secondary', 'main']
-12 = ['secondary', 'main']
-13 = ['secondary', 'main']
-14 = ['secondary', 'main']
-15 = ['secondary', 'main']
-16 = ['secondary', 'main']
-17 = ['secondary', 'main']
-18 = ['secondary', 'main']
-19 = ['secondary', 'main']
+11 = ['Q27G1WG4', 'secondary', 'main']
+12 = ['Q27G1WG4', 'secondary', 'main']
+13 = ['Q27G1WG4', 'secondary', 'main']
+14 = ['Q27G1WG4', 'secondary', 'main']
+15 = ['Q27G1WG4', 'secondary', 'main']
+16 = ['Q27G1WG4', 'secondary', 'main']
+17 = ['Q27G1WG4', 'secondary', 'main']
+18 = ['Q27G1WG4', 'secondary', 'main']
+19 = ['Q27G1WG4', 'secondary', 'main']
+21 = ['Built-in', 'main']
+22 = ['Built-in', 'main']
+23 = ['Built-in', 'main']
+24 = ['Built-in', 'main']
+25 = ['Built-in', 'main']
+26 = ['Built-in', 'main']
+27 = ['Built-in', 'main']
+28 = ['Built-in', 'main']
+29 = ['Built-in', 'main']

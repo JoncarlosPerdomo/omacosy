@@ -12,6 +12,16 @@ pick() { # monitor-id, slot -> that monitor's workspace ending in slot
     | awk -v s="$2" 'substr($0, length($0)) == s { print; exit }'
 }
 
+twin() { # monitor-id, slot -> same slot on the next monitor that has one
+  "$A" list-monitors --format '%{monitor-id}' | awk -v m="$1" '
+    { ids[NR] = $0; if ($0 == m) at = NR }
+    END { for (i = 1; i < NR; i++) print ids[(at + i - 1) % NR + 1] }' \
+    | while read -r other; do
+        ws="$(pick "$other" "$2")"
+        [ -n "$ws" ] && { echo "$ws"; break; }
+      done
+}
+
 # A window moved between two HIDDEN workspaces changes nothing on
 # screen, so the window server has no event to give the bar and its
 # workspace icons would sit stale. Builtin redirect, no extra process.
@@ -81,12 +91,14 @@ case "$op" in
       }')"
     [ -n "$target" ] && "$A" workspace "$target"
     ;;
+  # Both throws target the NEXT monitor in aerospace's order, the same
+  # order Ctrl+Alt+Tab (focus-monitor next) walks, so the two keys agree
+  # on three displays. A monitor whose set lacks the slot (e.g. a stray
+  # auto-created workspace) is skipped rather than silently ending the
+  # throw.
   throw-all) # EVERY window of the focused workspace to the twin slot
     cur="$("$A" list-workspaces --focused)"
-    s="${cur: -1}"
-    other="$("$A" list-monitors --format '%{monitor-id}' | grep -vx "$mon" | head -1 || true)"
-    [ -n "$other" ] || exit 0
-    ws="$(pick "$other" "$s")"
+    ws="$(twin "$mon" "${cur: -1}")"
     [ -n "$ws" ] || exit 0
     "$A" list-windows --workspace "$cur" --format '%{window-id}' | while read -r wid; do
       [ -n "$wid" ] && "$A" move-node-to-workspace --window-id "$wid" "$ws"
@@ -94,12 +106,9 @@ case "$op" in
     moved
     "$A" workspace "$ws"
     ;;
-  throw) # focused WINDOW to the same slot on the other monitor
+  throw) # focused WINDOW to the same slot on the next monitor
     cur="$("$A" list-workspaces --focused)"
-    s="${cur: -1}"
-    other="$("$A" list-monitors --format '%{monitor-id}' | grep -vx "$mon" | head -1 || true)"
-    [ -n "$other" ] || exit 0
-    ws="$(pick "$other" "$s")"
+    ws="$(twin "$mon" "${cur: -1}")"
     [ -n "$ws" ] && { "$A" move-node-to-workspace --focus-follows-window "$ws"; moved; }
     ;;
 esac
