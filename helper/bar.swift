@@ -1087,6 +1087,7 @@ let bluetoothWatcher = BluetoothWatcher()
 struct Weather {
     var emoji = ""
     var temp = ""
+    var unit = "C"     // the scale temp/feels/low/high are already in
     var desc = ""
     var feels = ""
     var low = ""
@@ -1147,26 +1148,34 @@ func updateWeather() {
             ((d[key] as? [[String: Any]])?.first?["value"] as? String) ?? ""
         }
 
+        // wttr answers in both systems; the Mac's region setting picks the
+        // one the user reads without a knob to set
+        let imperial = Locale.current.measurementSystem == .us
+
         var w = Weather()
         let hour = Calendar.current.component(.hour, from: Date())
         w.emoji = weatherEmoji(Int(text(current, "weatherCode")) ?? 0, night: hour < 7 || hour >= 20)
-        w.temp = text(current, "temp_C")
+        w.unit = imperial ? "F" : "C"
+        w.temp = text(current, imperial ? "temp_F" : "temp_C")
         w.desc = nested(current, "weatherDesc").lowercased()
-        w.feels = text(current, "FeelsLikeC")
-        w.low = text(today, "mintempC")
-        w.high = text(today, "maxtempC")
+        w.feels = text(current, imperial ? "FeelsLikeF" : "FeelsLikeC")
+        w.low = text(today, imperial ? "mintempF" : "mintempC")
+        w.high = text(today, imperial ? "maxtempF" : "maxtempC")
         w.humidity = text(current, "humidity")
 
         let degrees = Int(text(current, "winddirDegree")) ?? 0
         let arrows = ["↓", "↙", "←", "↖", "↑", "↗", "→", "↘"]
-        w.wind = "\(arrows[((degrees + 180) / 45) % 8]) \(text(current, "windspeedKmph")) km/h"
+        let speed = text(current, imperial ? "windspeedMiles" : "windspeedKmph")
+        w.wind = "\(arrows[((degrees + 180) / 45) % 8]) \(speed) \(imperial ? "mph" : "km/h")"
 
         // rain earns a row only with real signal: falling now, or likely today
         let precip = Double(text(current, "precipMM")) ?? 0
         let chance = ((today["hourly"] as? [[String: Any]]) ?? [])
             .compactMap { Int(($0["chanceofrain"] as? String) ?? "0") }.max() ?? 0
         if precip > 0 {
-            w.rain = "☔ \(text(current, "precipMM"))mm now"
+            w.rain = imperial
+                ? "☔ \(text(current, "precipInches"))in now"
+                : "☔ \(text(current, "precipMM"))mm now"
             if chance >= 30 { w.rain += " · rain \(chance)% today" }
         } else if chance >= 30 {
             w.rain = "☔ rain \(chance)% today"
@@ -1196,7 +1205,7 @@ func updateWeather() {
 
         DispatchQueue.main.async {
             weather = w
-            set("weather") { $0.icon = ""; $0.label = "\(w.emoji) \(w.temp)°C" }
+            set("weather") { $0.icon = ""; $0.label = "\(w.emoji) \(w.temp)°\(w.unit)" }
             if openPopup == "weather" { refreshPopup() }
         }
     }.resume()
@@ -1668,11 +1677,11 @@ func bluetoothRows() -> [PopupRow] {
 
 func weatherRows() -> [PopupRow] {
     guard let w = weather else { return [] }
-    var rows: [PopupRow] = [PopupRow(text: "\(w.emoji) \(w.temp)°C \(w.desc)", hero: true)]
+    var rows: [PopupRow] = [PopupRow(text: "\(w.emoji) \(w.temp)°\(w.unit) \(w.desc)", hero: true)]
 
     // feels-like earns a mention only when it differs from the real temp
-    var today = "today \(w.low)° → \(w.high)°C"
-    if w.feels != w.temp { today = "feels \(w.feels)°C · " + today }
+    var today = "today \(w.low)° → \(w.high)°\(w.unit)"
+    if w.feels != w.temp { today = "feels \(w.feels)°\(w.unit) · " + today }
     rows.append(PopupRow(text: today))
     rows.append(PopupRow(text: "wind \(w.wind) · humidity \(w.humidity)%"))
     if !w.rain.isEmpty { rows.append(PopupRow(text: w.rain)) }
