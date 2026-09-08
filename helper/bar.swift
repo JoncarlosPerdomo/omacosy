@@ -2489,6 +2489,17 @@ let chipPillHeight: CGFloat = 20
 let radius: CGFloat = 4
 let gap: CGFloat = 14
 
+// The activity pill's command, as an ABSOLUTE path: Ghostty runs `-e`
+// through `/usr/bin/login`, which does not inherit a login shell's PATH,
+// so a bare `btop` is "No such file or directory" on a Homebrew install.
+let activityCommand: String = {
+    let fm = FileManager.default
+    let dirs = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"]
+        + (ProcessInfo.processInfo.environment["PATH"]?.split(separator: ":").map(String.init) ?? [])
+    for dir in dirs where fm.isExecutableFile(atPath: dir + "/btop") { return dir + "/btop" }
+    return "btop"
+}()
+
 // The terminal the activity pill opens btop in. install.sh writes the
 // RESOLVED choice (apps.local.conf overrides already applied) next to the
 // other daemon configs, because a launchd agent cannot read the repo when
@@ -2783,7 +2794,7 @@ final class BarView: NSView {
                 URL(string: "x-apple.systempreferences:com.apple.Battery-Settings.extension")!)
         case "activity":
             DispatchQueue.global(qos: .userInitiated).async {
-                _ = shell("/usr/bin/open", ["-na", terminalApp, "--args", "--title=omacosy-activity", "-e", "btop"])
+                _ = shell("/usr/bin/open", ["-na", terminalApp, "--args", "--title=omacosy-activity", "-e", activityCommand])
             }
         default: break
         }
