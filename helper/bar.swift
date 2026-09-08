@@ -2489,31 +2489,50 @@ let chipPillHeight: CGFloat = 20
 let radius: CGFloat = 4
 let gap: CGFloat = 14
 
-// The activity pill's command, as an ABSOLUTE path: Ghostty runs `-e`
-// through `/usr/bin/login`, which does not inherit a login shell's PATH,
-// so a bare `btop` is "No such file or directory" on a Homebrew install.
+// App choices. install.sh writes the RESOLVED values (apps.local.conf
+// overrides already applied) next to the other daemon configs, because a
+// launchd agent cannot read the repo when the clone sits under
+// ~/Documents — which is exactly where this one is.
+func appsConf(_ key: String, default fallback: String) -> String {
+    let config = URL(fileURLWithPath: NSHomeDirectory())
+        .appendingPathComponent(".config/omacosy/apps.conf")
+    guard let text = try? String(contentsOf: config, encoding: .utf8) else { return fallback }
+    for line in text.split(separator: "\n") where line.hasPrefix(key + "=") {
+        let value = line.dropFirst(key.count + 1)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "\" "))
+        if !value.isEmpty { return value }
+    }
+    return fallback
+}
+
+// The terminal the activity pill opens its monitor in.
+let terminalApp = appsConf("TERMINAL", default: "Ghostty")
+
+// The monitor itself, as an ABSOLUTE path: the terminal runs `-e` through
+// `/usr/bin/login`, which does not inherit a login shell's PATH, so a bare
+// `btop` is "No such file or directory" on a Homebrew install.
 let activityCommand: String = {
+    let name = appsConf("ACTIVITY", default: "btop")
+    guard !name.hasPrefix("/") else { return name }
     let fm = FileManager.default
     let dirs = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"]
         + (ProcessInfo.processInfo.environment["PATH"]?.split(separator: ":").map(String.init) ?? [])
-    for dir in dirs where fm.isExecutableFile(atPath: dir + "/btop") { return dir + "/btop" }
-    return "btop"
+    for dir in dirs where fm.isExecutableFile(atPath: dir + "/" + name) { return dir + "/" + name }
+    return name
 }()
 
-// The terminal the activity pill opens btop in. install.sh writes the
-// RESOLVED choice (apps.local.conf overrides already applied) next to the
-// other daemon configs, because a launchd agent cannot read the repo when
-// the clone sits under ~/Documents — which is exactly where this one is.
-let terminalApp: String = {
-    let config = URL(fileURLWithPath: NSHomeDirectory())
-        .appendingPathComponent(".config/omacosy/apps.conf")
-    guard let text = try? String(contentsOf: config, encoding: .utf8) else { return "Ghostty" }
-    for line in text.split(separator: "\n") where line.hasPrefix("TERMINAL=") {
-        return line.dropFirst("TERMINAL=".count)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "\" "))
+// The window the pill opens carries this title so a second click can find
+// it — `open -na` spawns a fresh app instance every time and would
+// otherwise pile up a monitor per click.
+let activityTitle = "omacosy-activity"
+
+func activityWindowPID() -> pid_t? {
+    let out = shellOut("/usr/bin/pgrep", ["-f", "--", "--title=" + activityTitle])
+    for line in out.split(separator: "\n") {
+        if let pid = pid_t(line.trimmingCharacters(in: .whitespaces)) { return pid }
     }
-    return "Ghostty"
-}()
+    return nil
+}
 
 final class BarView: NSView {
     weak var surface: BarSurface?
@@ -2793,8 +2812,17 @@ final class BarView: NSView {
             NSWorkspace.shared.open(
                 URL(string: "x-apple.systempreferences:com.apple.Battery-Settings.extension")!)
         case "activity":
+            // already up: raise it rather than open a second one
             DispatchQueue.global(qos: .userInitiated).async {
-                _ = shell("/usr/bin/open", ["-na", terminalApp, "--args", "--title=omacosy-activity", "-e", activityCommand])
+                if let pid = activityWindowPID() {
+                    DispatchQueue.main.async {
+                        NSRunningApplication(processIdentifier: pid)?.activate()
+                    }
+                    return
+                }
+                _ = shell("/usr/bin/open",
+                          ["-na", terminalApp, "--args", "--title=" + activityTitle,
+                           "-e", activityCommand])
             }
         default: break
         }

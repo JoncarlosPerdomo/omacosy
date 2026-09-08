@@ -125,7 +125,9 @@ each rebuild as a new app and you re-grant after every install.
 ## App choices
 
 Keybindings launch apps defined in `config/apps.conf`. Defaults are
-Ghostty, Safari, Spotify, Slack (terminal, browser, music, messenger).
+Ghostty, Safari, Spotify, Slack (terminal, browser, music, messenger),
+plus `ACTIVITY=btop` — the system monitor the bar's activity pill opens
+in the terminal, given as a bare command name the bar resolves on PATH.
 Override any of them in `config/apps.local.conf` (gitignored), then
 re-run `install.sh`:
 
@@ -133,6 +135,7 @@ re-run `install.sh`:
 # config/apps.local.conf — your picks win over apps.conf
 TERMINAL=Korren
 BROWSER=Arc
+ACTIVITY=htop
 ```
 
 Your personal shell config belongs in `~/.zshrc.local`; the repo's
