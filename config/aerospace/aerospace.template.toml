@@ -91,7 +91,7 @@ cmd-ctrl-alt-enter = 'exec-and-forget $HOME/.local/bin/omacosy-spawn "@TERMINAL@
 cmd-ctrl-alt-shift-enter = 'exec-and-forget open -a "@BROWSER@"'
 
 # Launcher (omarchy: Super+Space)
-cmd-ctrl-alt-space = 'exec-and-forget open -a Raycast'
+cmd-ctrl-alt-space = 'exec-and-forget open -a "@LAUNCHER@"'
 
 # Close window (omarchy: Super+W)
 cmd-ctrl-alt-w = 'close'

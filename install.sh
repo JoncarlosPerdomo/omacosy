@@ -133,6 +133,7 @@ read_apps() {
       MUSIC) MUSIC="$v" ;;
       MESSENGER) MESSENGER="$v" ;;
       ACTIVITY) ACTIVITY="$v" ;;
+      LAUNCHER) LAUNCHER="$v" ;;
     esac
   done < "$f"
 }
@@ -140,6 +141,7 @@ read_apps "$REPO_DIR/config/apps.conf"
 read_apps "$REPO_DIR/config/apps.local.conf"
 sed -e "s|@TERMINAL@|$TERMINAL|g" -e "s|@BROWSER@|$BROWSER|g" \
     -e "s|@MUSIC@|$MUSIC|g" -e "s|@MESSENGER@|$MESSENGER|g" \
+    -e "s|@LAUNCHER@|${LAUNCHER:-Raycast}|g" \
   "$REPO_DIR/config/aerospace/aerospace.template.toml" > "$REPO_DIR/config/aerospace/aerospace.toml"
 
 log "Linking configs"

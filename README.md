@@ -127,7 +127,8 @@ each rebuild as a new app and you re-grant after every install.
 Keybindings launch apps defined in `config/apps.conf`. Defaults are
 Ghostty, Safari, Spotify, Slack (terminal, browser, music, messenger),
 plus `ACTIVITY=btop` — the system monitor the bar's activity pill opens
-in the terminal, given as a bare command name the bar resolves on PATH.
+in the terminal, given as a bare command name the bar resolves on PATH —
+and `LAUNCHER=Raycast`, the launcher on `Super+Space`.
 Override any of them in `config/apps.local.conf` (gitignored), then
 re-run `install.sh`:
 
@@ -136,6 +137,7 @@ re-run `install.sh`:
 TERMINAL=Korren
 BROWSER=Arc
 ACTIVITY=htop
+LAUNCHER=Alfred 5
 ```
 
 Your personal shell config belongs in `~/.zshrc.local`; the repo's
@@ -321,7 +323,7 @@ typing or app shortcuts. Caps Lock tapped alone is Escape.
 | `Super+shift+;` | service mode (`esc` reload, `r` flatten, `⌫` close others) |
 | **Apps and system** | |
 | `Super+enter` / `Super+shift+enter` | terminal / browser |
-| `Super+space` | launcher (Raycast; the OmniWM option opens OmniWM's command palette instead) |
+| `Super+space` | launcher (`LAUNCHER=` in `apps.conf`, default Raycast; the OmniWM option opens OmniWM's command palette instead) |
 | `Super+shift+f` / `+m` / `+g` | files / music / messenger (set in `apps.conf`) |
 | `Super+shift+t` | next theme |
 | `Super+shift+b` | next wallpaper of the current theme |
