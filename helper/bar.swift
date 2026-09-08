@@ -2181,7 +2181,12 @@ func karabinerExecCheatEntries() -> [CheatEntry] {
     return entries
 }
 
-let cheatColumns = 3
+// The sheet is laid out to fit the display it opens on: columns trade
+// width for height (three is the stock look, two is narrower and taller
+// for a laptop screen, four and five for a short wide one), and a scale
+// below 1 shrinks type and rows only when no split fits at full size.
+let cheatColumnChoices = [3, 2, 4, 5]
+let cheatScaleChoices: [CGFloat] = [1, 0.9, 0.8, 0.7, 0.6]
 let cheatRowH: CGFloat = 20
 let cheatPad: CGFloat = 18
 
@@ -2196,9 +2201,14 @@ final class CheatWindow: NSWindow {
 final class CheatsheetView: NSView {
     var entries: [CheatEntry] = []
     var filter = ""
-    private var keyFont: NSFont { nerdFont("Bold", 12) }
-    private var actFont: NSFont { nerdFont("Regular", 12) }
-    private var headFont: NSFont { nerdFont("Bold", 13) }
+    // set by fit(in:) — the layout that fits the current display
+    var columnCount = cheatColumnChoices[0]
+    var scale: CGFloat = 1
+    private var rowH: CGFloat { cheatRowH * scale }
+    private var pad: CGFloat { cheatPad * scale }
+    private var keyFont: NSFont { nerdFont("Bold", 12 * scale) }
+    private var actFont: NSFont { nerdFont("Regular", 12 * scale) }
+    private var headFont: NSFont { nerdFont("Bold", 13 * scale) }
 
     private func visibleEntries() -> [CheatEntry] {
         guard !filter.isEmpty else { return entries }
@@ -2227,7 +2237,7 @@ final class CheatsheetView: NSView {
     private func columns() -> [[(String?, CheatEntry?)]] {
         let all = rows()
         guard !all.isEmpty else { return [] }
-        let per = Int((Double(all.count) / Double(cheatColumns)).rounded(.up))
+        let per = Int((Double(all.count) / Double(columnCount)).rounded(.up))
         return stride(from: 0, to: all.count, by: per).map {
             Array(all[$0..<min($0 + per, all.count)])
         }
@@ -2243,7 +2253,7 @@ final class CheatsheetView: NSView {
                     a = max(a, advance(e.action, actFont))
                 }
             }
-            return (k, k + 14 + a)
+            return (k, k + 14 * scale + a)
         }
     }
 
@@ -2251,10 +2261,27 @@ final class CheatsheetView: NSView {
         let cols = columns()
         guard !cols.isEmpty else { return NSSize(width: 320, height: 80) }
         let widths = columnWidths()
-        let w = widths.reduce(0) { $0 + $1.total } + CGFloat(cols.count - 1) * 28
+        let w = widths.reduce(0) { $0 + $1.total } + CGFloat(cols.count - 1) * 28 * scale
         let tallest = cols.map(\.count).max() ?? 0
-        return NSSize(width: w + cheatPad * 2,
-                      height: CGFloat(tallest) * cheatRowH + cheatPad * 2 + 26)
+        return NSSize(width: w + pad * 2,
+                      height: CGFloat(tallest) * rowH + pad * 2 + 26 * scale)
+    }
+
+    // Picks the first column count / scale pair whose sheet fits `limit`,
+    // widest-and-largest first, and settles for the smallest candidate
+    // when nothing does. Returns the size to give the window.
+    @discardableResult
+    func fit(in limit: NSSize) -> NSSize {
+        var last = NSSize.zero
+        for s in cheatScaleChoices {
+            for c in cheatColumnChoices {
+                columnCount = c
+                scale = s
+                last = measure()
+                if last.width <= limit.width && last.height <= limit.height { return last }
+            }
+        }
+        return last
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -2269,24 +2296,24 @@ final class CheatsheetView: NSView {
         let title = filter.isEmpty
             ? "keybindings — Super is Caps Lock · type to search · Super+K, Esc or click to close"
             : "search: \(filter)▏ — \(visibleEntries().count) match\(visibleEntries().count == 1 ? "" : "es") · Esc clears"
-        drawText(title, nerdFont("Bold", 12), palette.accent.withAlphaComponent(0.8),
-                 leftAt: cheatPad, midY: bounds.maxY - cheatPad - 6)
+        drawText(title, nerdFont("Bold", 12 * scale), palette.accent.withAlphaComponent(0.8),
+                 leftAt: pad, midY: bounds.maxY - pad - 6 * scale)
 
-        var x = cheatPad
+        var x = pad
         for (i, col) in columns().enumerated() {
             let width = columnWidths()[i]
-            var y = bounds.maxY - cheatPad - 30
+            var y = bounds.maxY - pad - 30 * scale
             for (head, e) in col {
                 if let head {
-                    drawText(head, headFont, palette.accent, leftAt: x, midY: y - cheatRowH / 2)
+                    drawText(head, headFont, palette.accent, leftAt: x, midY: y - rowH / 2)
                 } else if let e {
-                    drawText(e.key, keyFont, palette.label, leftAt: x, midY: y - cheatRowH / 2)
+                    drawText(e.key, keyFont, palette.label, leftAt: x, midY: y - rowH / 2)
                     drawText(e.action, actFont, palette.muted,
-                             leftAt: x + width.key + 14, midY: y - cheatRowH / 2)
+                             leftAt: x + width.key + 14 * scale, midY: y - rowH / 2)
                 }
-                y -= cheatRowH
+                y -= rowH
             }
-            x += width.total + 28
+            x += width.total + 28 * scale
         }
     }
 
@@ -2315,13 +2342,20 @@ final class CheatsheetView: NSView {
     // the sheet shrinks to its matches — re-measure and keep the centre
     private func refit() {
         guard let window = window else { needsDisplay = true; return }
-        let size = measure()
+        let size = fit(in: cheatLimit(for: window.screen ?? NSScreen.main!))
         let c = NSPoint(x: window.frame.midX, y: window.frame.midY)
         frame = NSRect(origin: .zero, size: size)
         window.setFrame(NSRect(x: c.x - size.width / 2, y: c.y - size.height / 2,
                                width: size.width, height: size.height), display: true)
         needsDisplay = true
     }
+}
+
+// visibleFrame keeps the sheet clear of the bar strip and the Dock; the
+// inset is the margin that stops it touching the screen edges.
+func cheatLimit(for screen: NSScreen) -> NSSize {
+    let f = screen.visibleFrame.insetBy(dx: 24, dy: 24)
+    return NSSize(width: f.width, height: f.height)
 }
 
 var cheatWindow: CheatWindow?
@@ -2344,15 +2378,15 @@ func toggleCheatsheet() {
     }
     let view = CheatsheetView(frame: .zero)
     view.entries = entries
-    let size = view.measure()
-    view.frame = NSRect(origin: .zero, size: size)
     // centred on the display holding the cursor, like every other
     // full-surface thing here
     let mouse = NSEvent.mouseLocation
     let screen = NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main!
+    let size = view.fit(in: cheatLimit(for: screen))
+    view.frame = NSRect(origin: .zero, size: size)
     let window = CheatWindow(
-        contentRect: NSRect(x: screen.frame.midX - size.width / 2,
-                            y: screen.frame.midY - size.height / 2,
+        contentRect: NSRect(x: screen.visibleFrame.midX - size.width / 2,
+                            y: screen.visibleFrame.midY - size.height / 2,
                             width: size.width, height: size.height),
         styleMask: .borderless, backing: .buffered, defer: false)
     window.isOpaque = false
@@ -2368,7 +2402,7 @@ func toggleCheatsheet() {
     window.makeKeyAndOrderFront(nil)
     window.makeFirstResponder(view)
     cheatWindow = window
-    tlog("cheatsheet: \(entries.count) bindings")
+    tlog("cheatsheet: \(entries.count) bindings, \(view.columnCount) cols at scale \(view.scale) — \(Int(size.width))x\(Int(size.height)) in \(Int(cheatLimit(for: screen).width))x\(Int(cheatLimit(for: screen).height))")
 }
 
 // --- view -----------------------------------------------------------------
