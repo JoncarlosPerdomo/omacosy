@@ -284,7 +284,8 @@ startup and does no config-file or image-file I/O while it draws.
   API. Gamma is reset when the setting process exits, so a crash or an
   uninstall restores the screen by itself.
 - **Battery** / **Clock** (calendar popup) / **Activity** (floating
-  btop).
+  system monitor, `ACTIVITY=` in `apps.conf`; the pill toggles it — a
+  second click closes the window instead of opening another).
 - **Floats**: appears only while the workspace holds floating windows;
   click surfaces the next one.
 

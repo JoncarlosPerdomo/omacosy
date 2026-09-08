@@ -2521,15 +2521,40 @@ let activityCommand: String = {
     return name
 }()
 
-// The window the pill opens carries this title so a second click can find
-// it — `open -na` spawns a fresh app instance every time and would
-// otherwise pile up a monitor per click.
+// The window the pill opens carries this title, which is also how a bar
+// that restarted under an open monitor finds it again.
 let activityTitle = "omacosy-activity"
 
-func activityWindowPID() -> pid_t? {
-    let out = shellOut("/usr/bin/pgrep", ["-f", "--", "--title=" + activityTitle])
+// The instance the pill launched. `open -na` spawns a fresh app instance
+// every time — without a handle on it, every click piled up another
+// monitor.
+var activityApp: NSRunningApplication?
+
+func terminalAppURL() -> URL? {
+    if let running = NSWorkspace.shared.runningApplications
+        .first(where: { $0.localizedName == terminalApp })?.bundleURL { return running }
+    for dir in ["/Applications", NSHomeDirectory() + "/Applications"] {
+        let url = URL(fileURLWithPath: "\(dir)/\(terminalApp).app")
+        if FileManager.default.fileExists(atPath: url.path) { return url }
+    }
+    return nil
+}
+
+// Survives a bar restart: the monitor left running by the previous bar is
+// still findable by argv. The pattern carries the terminal's FULL binary
+// path, so it cannot match some unrelated process that merely mentions
+// the title (a shell command, an editor, this file open in a pager).
+func strayActivityPID() -> pid_t? {
+    guard let exe = terminalAppURL().flatMap({ Bundle(url: $0)?.executableURL?.path })
+    else { return nil }
+    let out = shellOut("/usr/bin/pgrep", ["-f", "--", "\(exe) --title=\(activityTitle)"])
     for line in out.split(separator: "\n") {
-        if let pid = pid_t(line.trimmingCharacters(in: .whitespaces)) { return pid }
+        guard let pid = pid_t(line.trimmingCharacters(in: .whitespaces)) else { continue }
+        // argv can lie — a grep or an editor holding the same string is a
+        // match too. Only a process whose EXECUTABLE is the terminal counts.
+        let comm = shellOut("/bin/ps", ["-p", "\(pid)", "-o", "comm="])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if comm == exe { return pid }
     }
     return nil
 }
@@ -2812,17 +2837,33 @@ final class BarView: NSView {
             NSWorkspace.shared.open(
                 URL(string: "x-apple.systempreferences:com.apple.Battery-Settings.extension")!)
         case "activity":
-            // already up: raise it rather than open a second one
+            // A switch, not a spawner: the second click closes the monitor.
+            // macOS offers no way to open a terminal window with a command
+            // in a RUNNING instance (`ghostty +new-window` is Linux-only),
+            // so every launch is its own app instance — without a close
+            // path each click stranded another terminal in the background.
+            // SIGTERM takes that instance down, monitor included, and asks
+            // nothing: an app-level quit prompts about the running process.
+            if let app = activityApp, !app.isTerminated {
+                kill(app.processIdentifier, SIGTERM)
+                activityApp = nil
+                return
+            }
             DispatchQueue.global(qos: .userInitiated).async {
-                if let pid = activityWindowPID() {
-                    DispatchQueue.main.async {
-                        NSRunningApplication(processIdentifier: pid)?.activate()
-                    }
+                if let stray = strayActivityPID() {
+                    kill(stray, SIGTERM)
                     return
                 }
                 _ = shell("/usr/bin/open",
                           ["-na", terminalApp, "--args", "--title=" + activityTitle,
                            "-e", activityCommand])
+                // `open` returns before the app registers; the instance we
+                // just made is the newest one carrying our title
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    if let pid = strayActivityPID() {
+                        activityApp = NSRunningApplication(processIdentifier: pid)
+                    }
+                }
             }
         default: break
         }
