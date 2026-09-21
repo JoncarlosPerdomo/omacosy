@@ -1,7 +1,14 @@
 # omacosy zsh — the CLI-stack wiring. Personal config belongs in
 # ~/.zshrc.local (sourced below), so this file stays generic.
 
-[ -x /opt/homebrew/bin/brew ] && eval "$(/opt/homebrew/bin/brew shellenv)"
+# Homebrew env. .zprofile already exports it for login shells; only fill in for
+# non-login interactive shells. `brew shellenv` shells out to /bin/ps, which the
+# Codex sandbox blocks, so this stays a static export instead of an eval.
+if [ -z "$HOMEBREW_PREFIX" ] && [ -x /opt/homebrew/bin/brew ]; then
+  export HOMEBREW_PREFIX="/opt/homebrew" HOMEBREW_CELLAR="/opt/homebrew/Cellar" HOMEBREW_REPOSITORY="/opt/homebrew"
+  export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$PATH"
+  fpath[1,0]="/opt/homebrew/share/zsh/site-functions"
+fi
 
 export PATH="$HOME/.local/bin:$PATH"
 
